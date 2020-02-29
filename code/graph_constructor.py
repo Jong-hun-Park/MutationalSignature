@@ -39,8 +39,17 @@ def construct_graph(input_file, jaccard_index_threshold=0.3):
             f.write(','.join(G[node].keys()))
             f.write("\n")
 
+    return G
+
+
+def draw_graph(G, jaccard_index_threshold):
+    import matplotlib.pyplot as plt
+    nx.draw_networkx(G)
+    plt.savefig("../figures/" + "graph_jaccard_index_" + str(jaccard_index_threshold) + ".png")
+
 
 if __name__ == "__main__":
-    jaccard_index_threshold = 0.5
+    jaccard_index_threshold = 0.4
     matrix_file = "Skin-Melanoma_ignore_0.csv"
-    construct_graph(matrix_file, jaccard_index_threshold)
+    graph = construct_graph(matrix_file, jaccard_index_threshold)
+    draw_graph(graph, jaccard_index_threshold)
