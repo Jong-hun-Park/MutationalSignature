@@ -7,7 +7,7 @@ def compute_jaccard_index(set1, set2):
     return jaccard_index
 
 
-def construct_graph(input_file, jaccard_index_treshold=0.3):
+def construct_graph(input_file, jaccard_index_threshold=0.3):
     # Loading Matrix file
     data_folder = "../data/"
     matrix_file = data_folder + input_file
@@ -27,11 +27,11 @@ def construct_graph(input_file, jaccard_index_treshold=0.3):
             set1 = set([j for j in range(len(list1)) if list1[j] == '1'])
             set2 = set([j for j in range(len(list2)) if list2[j] == '1'])
             jaccard_index = compute_jaccard_index(set1, set2)
-            if jaccard_index > jaccard_index_treshold:
+            if jaccard_index > jaccard_index_threshold:
                 G.add_edge(mutation_type1, mutation_type2)
 
     # Output graph as adjacent list
-    outfile = data_folder + matrix_file.split("/")[-1].split(".")[0] + "_graph" + ".csv"
+    outfile = data_folder + matrix_file.split("/")[-1].split(".")[0] + "_graph_" + str(jaccard_index_threshold) + ".csv"
     with open(outfile, "w") as f:
         for node in G.nodes_iter():
             f.write(node)
@@ -41,6 +41,6 @@ def construct_graph(input_file, jaccard_index_treshold=0.3):
 
 
 if __name__ == "__main__":
-    jaccard_index_threshold = 0.3
+    jaccard_index_threshold = 0.5
     matrix_file = "Skin-Melanoma_ignore_0.csv"
     construct_graph(matrix_file, jaccard_index_threshold)
