@@ -7,10 +7,10 @@ def compute_jaccard_index(set1, set2):
     return jaccard_index
 
 
-def construct_graph(jaccard_index_treshold=0.3):
+def construct_graph(input_file, jaccard_index_treshold=0.3):
     # Loading Matrix file
     data_folder = "../data/"
-    matrix_file = data_folder + "Skin-Melanoma_ignore_0.csv"
+    matrix_file = data_folder + input_file
     mutation_dict = dict()
     with open(matrix_file, "r") as f:
         header = f.readline()
@@ -42,4 +42,5 @@ def construct_graph(jaccard_index_treshold=0.3):
 
 if __name__ == "__main__":
     jaccard_index_threshold = 0.3
-    construct_graph(jaccard_index_threshold)
+    matrix_file = "Skin-Melanoma_ignore_0.csv"
+    construct_graph(matrix_file, jaccard_index_threshold)
