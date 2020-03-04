@@ -78,15 +78,32 @@ def first_level_cluster(G):
 
     return clusters
 
-def objective(G, cluster):
-    print "for cluster ", cluster
+def objective(G, cluster, verbose=True):
+    if verbose:
+        print "for cluster ", cluster
     non_cluster_nodes = set(G.nodes).difference(set(cluster))
-    print "cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes)
-    print "deficit: ", get_deficit(G, cluster)
+    if verbose:
+        print "cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes)
+        print "deficit: ", get_deficit(G, cluster)
     alpha = 1.0 / len(cluster)**2
     obj = alpha * get_cut_capacity(G, cluster, non_cluster_nodes) + get_deficit(G, cluster)
-    print "obj is ", obj
+    if verbose:
+        print "obj is ", obj
     return obj
+
+def get_neighboring_clusters(G, clusters):
+    neighboring_clusters = {}
+    for cluster_id_1 in clusters.keys():
+        neighboring_clusters[cluster_id_1] = set()
+        for cluster_id_2 in clusters.keys():
+            if cluster_id_1 == cluster_id_2:
+                continue
+            for node_1 in clusters[cluster_id_1]:
+                for node_2 in clusters[cluster_id_2]:
+                    if node_2 in G.adj[node_1]:
+                        neighboring_clusters[cluster_id_1].add(cluster_id_2)
+
+    return neighboring_clusters
 
 def cluster(G):
     #test_get_deficit()
@@ -95,13 +112,31 @@ def cluster(G):
     print clusters
     for cluster_id in clusters.keys():
         objective(G, clusters[cluster_id])
+
+    neighboring_clusters = get_neighboring_clusters(G, clusters)
+    #print neighboring_clusters
+    for cluster_id_1 in neighboring_clusters:
+        for cluster_id_2 in neighboring_clusters[cluster_id_1]:
+            if cluster_id_1 != cluster_id_2 and objective(G, clusters[cluster_id_1] + clusters[cluster_id_2], False) < min(objective(G, clusters[cluster_id_1], False), objective(G, clusters[cluster_id_2], False)): # merge clusters
+                neighboring_clusters[cluster_id_1] = neighboring_clusters[cluster_id_1].union(neighboring_clusters[cluster_id_2])
+                neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
+                clusters[cluster_id_1] = list(set(clusters[cluster_id_1] + clusters[cluster_id_2]))
+                clusters[cluster_id_2] = clusters[cluster_id_1]
+                print "merging clusters ", cluster_id_1, " and ", cluster_id_2
+                #print clusters
+                #print neighboring_clusters
+
+    #print neighboring_clusters
+    print "merged clusters: ", clusters
+    for cluster_id in clusters.keys():
+        objective(G, clusters[cluster_id])
     #objective(G, clusters[2])
     #objective(G, clusters[3])
     #objective(G, clusters[2] + clusters[3])
     #objective(G, clusters[2] + clusters[3] + clusters[7])
     #objective(G, clusters[1])
-    objective(G, clusters[0] + clusters[2])
-    objective(G, ["C>T/TCC", "C>T/TCG", "C>T/CCC", "C>T/CCG"])
+    #objective(G, clusters[0] + clusters[2])
+    #objective(G, ["C>T/TCC", "C>T/TCG", "C>T/CCC", "C>T/CCG"])
     print len(G.adj['C>T/TCC'])
     return clusters
 
