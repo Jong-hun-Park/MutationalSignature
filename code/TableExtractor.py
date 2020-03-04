@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
 
-Cancer_type = 'Skin-Melanoma'
+Cancer_type = 'Ovary-AdenoCa'
 data = pd.read_csv('../data/WES_TCGA.96.csv')
 columns = data.columns
 selected_col = ['Mutation type', 'Trinucleotide']
 
 for c in columns:
+    # if c.startswith(Cancer_type):
     if Cancer_type in c:
         selected_col.append(c)
 sub_data = data[selected_col]
