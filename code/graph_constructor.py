@@ -44,12 +44,24 @@ def construct_graph(input_file, jaccard_index_threshold=0.3):
 
 def draw_graph(G, jaccard_index_threshold):
     import matplotlib.pyplot as plt
-    nx.draw_networkx(G)
-    plt.savefig("../figures/" + "graph_jaccard_index_" + str(jaccard_index_threshold) + ".png")
+    pos = nx.spring_layout(G)
+    nx.draw_networkx_nodes(G, pos, node_color='b', node_size=50)
+    nx.draw_networkx_edges(G, pos, width=1.0)
+    plt.title("Jaccard index threshold {}".format(jaccard_index_threshold))
+    plt.savefig("../figures/" + "graph_jaccard_index_" + str(jaccard_index_threshold) + ".png", size=(17,10))
+
+
+def output_graph(graph):
+    with open("graph_edges.csv", "w") as f:
+        for edge in graph.edges_iter():
+            f.write(str(edge[0]) + "," + str(edge[1]) + "\n")
+
+        for node in graph.nodes_iter():
+            f.write(str(node) + "\n")
 
 
 if __name__ == "__main__":
     jaccard_index_threshold = 0.4
-    matrix_file = "Skin-Melanoma_ignore_0.csv"
+    matrix_file = "Skin-Melanoma.csv"
     graph = construct_graph(matrix_file, jaccard_index_threshold)
     draw_graph(graph, jaccard_index_threshold)
