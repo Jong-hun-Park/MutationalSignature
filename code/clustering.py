@@ -107,15 +107,15 @@ def first_level_cluster(G):
 
 def objective(G, cluster, verbose=True):
     if verbose:
-        print "for cluster ", cluster
+        print ("for cluster ", cluster)
     non_cluster_nodes = set(G.nodes).difference(set(cluster))
     if verbose:
-        print "cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes)
-        print "deficit: ", get_deficit(G, cluster)
+        print ("cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes))
+        print ("deficit: ", get_deficit(G, cluster))
     alpha = 1.0 / len(cluster)**2
     obj = alpha * get_cut_capacity(G, cluster, non_cluster_nodes) + get_deficit(G, cluster)
     if verbose:
-        print "obj is ", obj
+        print ("obj is ", obj)
     return obj
 
 def get_neighboring_clusters(G, clusters):
@@ -149,7 +149,7 @@ def get_merge_clusters(G, clusters):
                 neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
                 clusters[cluster_id_1] = list(set(clusters[cluster_id_1] + clusters[cluster_id_2]))
                 clusters[cluster_id_2] = clusters[cluster_id_1]
-                print "merging clusters ", cluster_id_1, " and ", cluster_id_2
+                print ("merging clusters ", cluster_id_1, " and ", cluster_id_2)
                 #print clusters
                 #print neighboring_clusters
     merged_clusters = {}
@@ -165,11 +165,11 @@ def cluster(G):
     #test_get_deficit()
     #test_cut_capacity()
     clusters = first_level_cluster(G)
-    print "Initial clusters: ", clusters
+    print ("Initial clusters: ", clusters)
     for cluster_id in clusters.keys():
         objective(G, clusters[cluster_id])
     clusters, groups = get_merge_clusters(G, clusters)
-    print "merged_clusters: ", clusters
+    print ("merged_clusters: ", clusters)
     for cluster_id in clusters.keys():
         objective(G, clusters[cluster_id])
     #objective(G, clusters[2])
@@ -208,7 +208,7 @@ def predict(clusters, matrix, threshold=0.3):
     individuals = matrix.keys()
     print("len mixed individuals: ", len(individuals))
     for cluster in clusters.values():
-        print "predicting for cluster: ", cluster
+        print ("predicting for cluster: ", cluster)
         #for individual_index in range(2, len(matrix.columns)):
         for individual in individuals:
             mutations_in_individual = set()

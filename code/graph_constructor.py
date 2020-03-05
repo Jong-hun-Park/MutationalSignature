@@ -77,7 +77,7 @@ def construct_graph(input_file, jaccard_index_threshold=0.3):
     # Output graph as adjacent list
     outfile = data_folder + matrix_file.split("/")[-1].split(".")[0] + "_graph_" + str(jaccard_index_threshold) + ".csv"
     with open(outfile, "w") as f:
-        for node in G.nodes_iter():
+        for node in G.nodes():
             f.write(node)
             f.write(":")  # adjacent list delimiter
             f.write(','.join(G[node].keys()))
