@@ -51,10 +51,11 @@ def draw_graph(G, jaccard_index_threshold):
     plt.savefig("../figures/" + "graph_jaccard_index_" + str(jaccard_index_threshold) + ".png", size=(17,10))
 
 
-def output_graph(graph):
-    with open("graph_edges.csv", "w") as f:
+def output_graph(graph, outfile_name="graph_edge_node.csv"):
+    with open(outfile_name, "w") as f:
         for edge in graph.edges_iter():
-            f.write(str(edge[0]) + "," + str(edge[1]) + "\n")
+            if edge[0] != edge[1]:
+                f.write(str(edge[0]) + "," + str(edge[1]) + "\n")
 
         for node in graph.nodes_iter():
             f.write(str(node) + "\n")
@@ -64,4 +65,5 @@ if __name__ == "__main__":
     jaccard_index_threshold = 0.4
     matrix_file = "Skin-Melanoma.csv"
     graph = construct_graph(matrix_file, jaccard_index_threshold)
+    # output_graph(graph)
     draw_graph(graph, jaccard_index_threshold)
