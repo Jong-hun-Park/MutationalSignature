@@ -45,8 +45,10 @@ def get_jaccard_index_threshold_from_kde(input_file, target_percentile=0.97):
     return x_point
 
 
+
 def compute_jaccard_index(set1, set2):
     intersect = set1 & set2
+    jaccard_index = float(len(intersect)) / (len(set1) + len(set2))
     jaccard_index = float(len(intersect)) / len(set1.union(set2))
     return jaccard_index
 
@@ -68,6 +70,8 @@ def construct_graph(input_file, jaccard_index_threshold=0.3):
     G = nx.Graph()
     for mutation_type1, list1 in mutation_dict.items():
         for mutation_type2, list2 in mutation_dict.items():
+            if mutation_type1 == mutation_type2:
+                continue
             set1 = set([j for j in range(len(list1)) if list1[j] == '1'])
             set2 = set([j for j in range(len(list2)) if list2[j] == '1'])
             jaccard_index = compute_jaccard_index(set1, set2)
@@ -77,7 +81,7 @@ def construct_graph(input_file, jaccard_index_threshold=0.3):
     # Output graph as adjacent list
     outfile = data_folder + matrix_file.split("/")[-1].split(".")[0] + "_graph_" + str(jaccard_index_threshold) + ".csv"
     with open(outfile, "w") as f:
-        for node in G.nodes_iter():
+        for node in G.nodes:
             f.write(node)
             f.write(":")  # adjacent list delimiter
             f.write(','.join(G[node].keys()))
@@ -88,26 +92,13 @@ def construct_graph(input_file, jaccard_index_threshold=0.3):
 
 def draw_graph(G, jaccard_index_threshold):
     import matplotlib.pyplot as plt
-    pos = nx.spring_layout(G)
-    nx.draw_networkx_nodes(G, pos, node_color='b', node_size=50)
-    nx.draw_networkx_edges(G, pos, width=1.0)
-    plt.title("Jaccard index threshold {}".format(jaccard_index_threshold))
-    plt.savefig("../figures/" + "graph_jaccard_index_" + str(jaccard_index_threshold) + ".png", size=(17,10))
-
-
-def output_graph(graph, outfile_name="graph_edge_node.csv"):
-    with open(outfile_name, "w") as f:
-        for edge in graph.edges_iter():
-            if edge[0] != edge[1]:
-                f.write(str(edge[0]) + "," + str(edge[1]) + "\n")
-
-        for node in graph.nodes_iter():
-            f.write(str(node) + "\n")
+    nx.draw_networkx(G)
+    plt.savefig("../figures/" + "graph_jaccard_index_" + str(jaccard_index_threshold) + ".png")
 
 
 if __name__ == "__main__":
     jaccard_index_threshold = 0.4
-    matrix_file = "Skin-Melanoma.csv"
+    matrix_file = "Skin-Melanoma_ignore_0.csv"
     # matrix_file = "Pheochromocytoma.csv"
     # matrix_file = "Cervix-CA.csv"
     # matrix_file = "Transitional-cell-carcinoma.csv"
@@ -116,5 +107,4 @@ if __name__ == "__main__":
 
     jaccard_index_threshold = get_jaccard_index_threshold_from_kde(matrix_file)
     graph = construct_graph(matrix_file, jaccard_index_threshold)
-    # output_graph(graph)
     draw_graph(graph, jaccard_index_threshold)
