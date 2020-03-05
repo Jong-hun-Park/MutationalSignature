@@ -1,7 +1,24 @@
 import numpy as np
+import pandas as pd
 import networkx as nx
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, AffinityPropagation, AgglomerativeClustering
+from graph_constructor import compute_jaccard_index
 
+class DisjointSet:
+    def __init__(self, vertices, parent):
+        self.vertices = vertices
+        self.parent = parent
+
+    def find(self, item):
+        if self.parent[item] == item:
+            return item
+        else:
+            return self.find(self.parent[item])
+
+    def union(self, set1, set2):
+        root1 = self.find(set1)
+        root2 = self.find(set2)
+        self.parent[root1] = root2
 
 def get_dist_matrix(G, name_to_id):
     n = len(G.nodes)
@@ -12,6 +29,13 @@ def get_dist_matrix(G, name_to_id):
             neighbor_id = name_to_id[neighbor]
             matrix[node_id][neighbor_id] = 0
             matrix[neighbor_id][node_id] = 0
+    return matrix
+
+def get_similarity_matrix(G, name_to_id):
+    matrix = get_dist_matrix(G, name_to_id)
+    for i in range(len(matrix)):
+        for j in range(len(matrix[i])):
+            matrix[i][j] = 1 - matrix[i][j]
     return matrix
 
 def get_node_id_map(G):
@@ -65,8 +89,11 @@ def test_cut_capacity():
 
 def first_level_cluster(G):
     name_to_id, id_to_name = get_node_id_map(G)
-    matrix = get_dist_matrix(G, name_to_id)
-    clustering = DBSCAN(eps=0.5, min_samples=2).fit(matrix)
+    dist_matrix = get_dist_matrix(G, name_to_id)
+    sim_matrix = get_similarity_matrix(G, name_to_id)
+    clustering = DBSCAN(eps=0.5, min_samples=1).fit(dist_matrix)
+    #clustering = AffinityPropagation(affinity='precomputed').fit(sim_matrix)
+    #clusters = AgglomerativeClustering(linkage="average", connectivity=sim_matrix, affinity="precomputed").fit(dist_matrix)
     clusters = {}
     cluster_ids = set(clustering.labels_).difference({-1})
     for cluster in cluster_ids:
@@ -80,15 +107,15 @@ def first_level_cluster(G):
 
 def objective(G, cluster, verbose=True):
     if verbose:
-        print "for cluster ", cluster
+        print ("for cluster ", cluster)
     non_cluster_nodes = set(G.nodes).difference(set(cluster))
     if verbose:
-        print "cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes)
-        print "deficit: ", get_deficit(G, cluster)
+        print ("cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes))
+        print ("deficit: ", get_deficit(G, cluster))
     alpha = 1.0 / len(cluster)**2
     obj = alpha * get_cut_capacity(G, cluster, non_cluster_nodes) + get_deficit(G, cluster)
     if verbose:
-        print "obj is ", obj
+        print ("obj is ", obj)
     return obj
 
 def get_neighboring_clusters(G, clusters):
@@ -105,29 +132,44 @@ def get_neighboring_clusters(G, clusters):
 
     return neighboring_clusters
 
-def cluster(G):
-    #test_get_deficit()
-    #test_cut_capacity()
-    clusters = first_level_cluster(G)
-    print clusters
-    for cluster_id in clusters.keys():
-        objective(G, clusters[cluster_id])
-
+def get_merge_clusters(G, clusters):
+    parent = {}
+    for cluster_id in clusters:
+        parent[cluster_id] = cluster_id
+    groups = DisjointSet(clusters.keys(), parent)
     neighboring_clusters = get_neighboring_clusters(G, clusters)
     #print neighboring_clusters
     for cluster_id_1 in neighboring_clusters:
         for cluster_id_2 in neighboring_clusters[cluster_id_1]:
-            if cluster_id_1 != cluster_id_2 and objective(G, clusters[cluster_id_1] + clusters[cluster_id_2], False) < min(objective(G, clusters[cluster_id_1], False), objective(G, clusters[cluster_id_2], False)): # merge clusters
+            # merge clusters if they it decreases the objective for both
+            if cluster_id_1 != cluster_id_2 and objective(G, clusters[cluster_id_1] + clusters[cluster_id_2], False)\
+                    < min(objective(G, clusters[cluster_id_1], False), objective(G, clusters[cluster_id_2], False)):
+                groups.union(cluster_id_1, cluster_id_2)
                 neighboring_clusters[cluster_id_1] = neighboring_clusters[cluster_id_1].union(neighboring_clusters[cluster_id_2])
                 neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
                 clusters[cluster_id_1] = list(set(clusters[cluster_id_1] + clusters[cluster_id_2]))
                 clusters[cluster_id_2] = clusters[cluster_id_1]
-                print "merging clusters ", cluster_id_1, " and ", cluster_id_2
+                print ("merging clusters ", cluster_id_1, " and ", cluster_id_2)
                 #print clusters
                 #print neighboring_clusters
+    merged_clusters = {}
+    for node in groups.vertices:
+        parent = groups.find(node)
+        if parent in merged_clusters:
+            continue
+        merged_clusters[parent] = clusters[parent]
+    return merged_clusters, groups
 
-    #print neighboring_clusters
-    print "merged clusters: ", clusters
+
+def cluster(G):
+    #test_get_deficit()
+    #test_cut_capacity()
+    clusters = first_level_cluster(G)
+    print ("Initial clusters: ", clusters)
+    for cluster_id in clusters.keys():
+        objective(G, clusters[cluster_id])
+    clusters, groups = get_merge_clusters(G, clusters)
+    print ("merged_clusters: ", clusters)
     for cluster_id in clusters.keys():
         objective(G, clusters[cluster_id])
     #objective(G, clusters[2])
@@ -137,9 +179,57 @@ def cluster(G):
     #objective(G, clusters[1])
     #objective(G, clusters[0] + clusters[2])
     #objective(G, ["C>T/TCC", "C>T/TCG", "C>T/CCC", "C>T/CCG"])
-    print len(G.adj['C>T/TCC'])
     return clusters
 
+def get_individuals_from_file(file_name):
+    mutation_matrix = pd.read_csv(file_name)
+    return mutation_matrix.columns[2:]
+
+def get_dict_from_df(df):
+    dict = {"Mutation type": [], "Trinucleotide":[]}
+    for ind in df:
+        dict[ind] = []
+        for j in df[ind]:
+            dict[ind].append(j)
+    for t in df["Mutation type"]:
+        dict["Mutation type"].append(t)
+    for t in df["Trinucleotide"]:
+        dict["Trinucleotide"].append(t)
+
+    return dict
+
+def merge_dicts(dict_1, dict_2):
+    for ind in dict_1:
+        dict_2[ind] = dict_1[ind]
+    return dict_2
+
+def predict(clusters, matrix, threshold=0.3):
+    individuals_with_signiture = []
+    individuals = matrix.keys()
+    print("len mixed individuals: ", len(individuals))
+    for cluster in clusters.values():
+        print ("predicting for cluster: ", cluster)
+        #for individual_index in range(2, len(matrix.columns)):
+        for individual in individuals:
+            mutations_in_individual = set()
+            for i in range(len(matrix[individual])):
+                if matrix[individual][i] == 1:
+                    mutations_in_individual.add(matrix["Mutation type"][i] + "/" + matrix["Trinucleotide"][i])
+            shared_mutations = float(len(mutations_in_individual.intersection(set(cluster)))) / float(len(cluster))
+            if shared_mutations >= threshold:
+                individuals_with_signiture.append(individual)
+    return list(set(individuals_with_signiture))
+
+def measure(all_individuals, predicted_disease, true_disease):
+    #print "predicted_disease: ", predicted_disease
+    #print "true_disease: ", true_disease
+    #print "all_individuals: ", all_individuals
+    true_positive = len([ind for ind in predicted_disease if ind in true_disease])
+    false_positive = len([ind for ind in predicted_disease if ind not in true_disease])
+    false_negatives = len([ind for ind in true_disease if ind not in predicted_disease])
+    precision = float(true_positive) / (true_positive + false_positive + 0.01)
+    recall = float(true_positive) / (true_positive + false_negatives + 0.01)
+    print("TP: {}, FP: {}, FN: {}, precision: {}, recall: {}".format(true_positive, false_positive, false_negatives, precision, recall))
 
 if __name__ == "__main__":
     pass
