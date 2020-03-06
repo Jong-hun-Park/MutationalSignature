@@ -89,11 +89,11 @@ def test_cut_capacity():
     G.add_edge("a", "d")
     print("Expected cut capacity: 3, actual: {}".format(get_cut_capacity(G, ["a", "b"])))
 
-def first_level_cluster(G):
+def first_level_cluster(G, dbscan_min_samples):
     name_to_id, id_to_name = get_node_id_map(G)
     dist_matrix = get_dist_matrix(G, name_to_id)
     sim_matrix = get_similarity_matrix(G, name_to_id)
-    clustering = DBSCAN(eps=0.5, min_samples=1).fit(dist_matrix)
+    clustering = DBSCAN(eps=0.5, min_samples=dbscan_min_samples).fit(dist_matrix)
     #clustering = AffinityPropagation(affinity='precomputed').fit(sim_matrix)
     #clusters = AgglomerativeClustering(linkage="average", connectivity=sim_matrix, affinity="precomputed").fit(dist_matrix)
     clusters = {}
@@ -137,7 +137,7 @@ def get_neighboring_clusters(G, clusters):
 def score_clusters(G, clusters):
     sum_score = 0
     for cluster in clusters:
-        sum_score += objective(G, clusters[cluster])
+        sum_score += objective(G, clusters[cluster], False)
 
 def get_merge_clusters(G, clusters, neighboring_clusters):
     parent = {}
@@ -173,37 +173,44 @@ def get_merge_clusters(G, clusters, neighboring_clusters):
     return merged_clusters, groups
 
 
-def cluster(G):
+def cluster(G, mode):
+    dbscan_min_samples = 1
+    print("clustering for mode {}".format(mode))
+    if mode == 'dbscan':
+        dbscan_min_samples = 2
+        clusters = first_level_cluster(G, dbscan_min_samples)
+        print ("Initial clusters: ", clusters)
+        for cluster_id in clusters.keys():
+            objective(G, clusters[cluster_id])
+        return
     #test_get_deficit()
     #test_cut_capacity()
-    clusters = first_level_cluster(G)
-    print ("Initial clusters: ", clusters)
-    for cluster_id in clusters.keys():
-        objective(G, clusters[cluster_id])
+    initial_clusters = first_level_cluster(G, dbscan_min_samples)
+    print ("Initial clusters: ", initial_clusters)
+    for cluster_id in initial_clusters.keys():
+        objective(G, initial_clusters[cluster_id])
 
 
-    min_merged_cluster_score = sys.maxint
-    min_scoring_clusters = None
-    min_scoring_groups = None
-    for i in range(50):
-        neighboring_clusters = get_neighboring_clusters(G, clusters)
-        merged_clusters, groups = get_merge_clusters(G, clusters, neighboring_clusters)
-        cur_score = score_clusters(G, merged_clusters)
-        if cur_score < min_merged_cluster_score:
-            min_merged_cluster_score = cur_score
-            min_scoring_clusters = merged_clusters
-            min_scoring_groups = groups
-    print ("merged_clusters: ", min_scoring_clusters)
-    for cluster_id in min_scoring_clusters.keys():
-        objective(G, min_scoring_clusters[cluster_id])
-    #objective(G, clusters[2])
-    #objective(G, clusters[3])
-    #objective(G, clusters[2] + clusters[3])
-    #objective(G, clusters[2] + clusters[3] + clusters[7])
-    #objective(G, clusters[1])
-    #objective(G, clusters[0] + clusters[2])
-    #objective(G, ["C>T/TCC", "C>T/TCG", "C>T/CCC", "C>T/CCG"])
-    return clusters
+    initial_neighboring_clusters = get_neighboring_clusters(G, initial_clusters)
+    if mode == 'greedy':
+        merged_clusters, groups = get_merge_clusters(G, initial_clusters, initial_neighboring_clusters)
+    elif mode == 'random':
+        min_merged_cluster_score = sys.maxint
+        min_scoring_clusters = None
+        min_scoring_groups = None
+        for i in range(10):
+            merged_clusters, groups = get_merge_clusters(G, initial_clusters, initial_neighboring_clusters)
+            cur_score = score_clusters(G, merged_clusters)
+            if cur_score < min_merged_cluster_score:
+                min_merged_cluster_score = cur_score
+                min_scoring_clusters = merged_clusters
+                min_scoring_groups = groups
+        merged_clusters = min_scoring_clusters
+
+    print ("merged_clusters: ", merged_clusters)
+    for cluster_id in merged_clusters.keys():
+        objective(G, merged_clusters[cluster_id])
+    return merged_clusters
 
 def get_individuals_from_file(file_name):
     mutation_matrix = pd.read_csv(file_name)

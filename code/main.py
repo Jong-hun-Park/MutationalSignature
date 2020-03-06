@@ -15,14 +15,16 @@ input = '../data/WES_TCGA.96.csv'
 print("Matrix file is extracted")
 
 # Construct Graph
-jaccard_index_threshold = 0.7
+jaccard_index_threshold = 0.4
 #matrix_file = cancer_type + "_ignore_0" + ".csv"
 matrix_file = cancer_type + ".csv"
 G = construct_graph(matrix_file, jaccard_index_threshold)
 print("Graph is constructed")
 matrix_file = "../data/" + matrix_file
 print("Number of edges in the graph: {}".format(len(G.edges)))
-clusters = cluster(G)
+clusters = cluster(G, 'dbscan')
+clusters = cluster(G, 'greedy')
+clusters = cluster(G, 'random')
 
 
 # # to predict
