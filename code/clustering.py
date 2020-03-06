@@ -138,13 +138,13 @@ def score_clusters(G, clusters):
     sum_score = 0
     for cluster in clusters:
         sum_score += objective(G, clusters[cluster], False)
+    return sum_score
 
 def get_merge_clusters(G, clusters, neighboring_clusters):
     parent = {}
     for cluster_id in clusters:
         parent[cluster_id] = cluster_id
     groups = DisjointSet(clusters.keys(), parent)
-    #print neighboring_clusters
     cluster_permutations_1 = np.random.permutation(list(set(groups.parent)))
     for cluster_id_1 in cluster_permutations_1:
         cluster_permutations_2 = np.random.permutation(list(set(groups.parent)))
@@ -159,9 +159,6 @@ def get_merge_clusters(G, clusters, neighboring_clusters):
                 neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
                 clusters[cluster_id_1] = list(set(clusters[cluster_id_1] + clusters[cluster_id_2]))
                 clusters[cluster_id_2] = clusters[cluster_id_1]
-                print "merging clusters ", cluster_id_1, " and ", cluster_id_2
-                #print clusters
-                #print neighboring_clusters
     merged_clusters = {}
     for node in groups.vertices:
         parent = groups.find(node)
@@ -188,17 +185,18 @@ def cluster(G, mode):
     initial_clusters = first_level_cluster(G, dbscan_min_samples)
     print ("Initial clusters: ", initial_clusters)
     for cluster_id in initial_clusters.keys():
-        objective(G, initial_clusters[cluster_id])
+        objective(G, initial_clusters[cluster_id], False)
 
 
     initial_neighboring_clusters = get_neighboring_clusters(G, initial_clusters)
     if mode == 'greedy':
         merged_clusters, groups = get_merge_clusters(G, initial_clusters, initial_neighboring_clusters)
     elif mode == 'random':
+        num_randomization = 100
         min_merged_cluster_score = sys.maxint
         min_scoring_clusters = None
         min_scoring_groups = None
-        for i in range(10):
+        for i in range(num_randomization):
             merged_clusters, groups = get_merge_clusters(G, initial_clusters, initial_neighboring_clusters)
             cur_score = score_clusters(G, merged_clusters)
             if cur_score < min_merged_cluster_score:
