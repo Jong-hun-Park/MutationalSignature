@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import pandas as pd
 import networkx as nx
 from sklearn.cluster import DBSCAN, AffinityPropagation, AgglomerativeClustering
@@ -13,7 +14,8 @@ class DisjointSet:
         if self.parent[item] == item:
             return item
         else:
-            return self.find(self.parent[item])
+            self.parent[item] = self.find(self.parent[item])
+            return self.parent[item]
 
     def union(self, set1, set2):
         root1 = self.find(set1)
@@ -112,7 +114,7 @@ def objective(G, cluster, verbose=True):
     if verbose:
         print ("cut capacity: ", get_cut_capacity(G, cluster, non_cluster_nodes))
         print ("deficit: ", get_deficit(G, cluster))
-    alpha = 1.0 / len(cluster)**2
+    alpha = 1.0 / len(cluster)
     obj = alpha * get_cut_capacity(G, cluster, non_cluster_nodes) + get_deficit(G, cluster)
     if verbose:
         print ("obj is ", obj)
@@ -132,32 +134,42 @@ def get_neighboring_clusters(G, clusters):
 
     return neighboring_clusters
 
-def get_merge_clusters(G, clusters):
+def score_clusters(G, clusters):
+    sum_score = 0
+    for cluster in clusters:
+        sum_score += objective(G, clusters[cluster])
+
+def get_merge_clusters(G, clusters, neighboring_clusters):
     parent = {}
     for cluster_id in clusters:
         parent[cluster_id] = cluster_id
     groups = DisjointSet(clusters.keys(), parent)
-    neighboring_clusters = get_neighboring_clusters(G, clusters)
     #print neighboring_clusters
-    for cluster_id_1 in neighboring_clusters:
-        for cluster_id_2 in neighboring_clusters[cluster_id_1]:
+    cluster_permutations_1 = np.random.permutation(list(set(groups.parent)))
+    for cluster_id_1 in cluster_permutations_1:
+        cluster_permutations_2 = np.random.permutation(list(set(groups.parent)))
+        for cluster_id_2 in cluster_permutations_2:
+            if cluster_id_1 == cluster_id_2 or cluster_id_2 not in neighboring_clusters[cluster_id_1]:
+                continue
             # merge clusters if they it decreases the objective for both
-            if cluster_id_1 != cluster_id_2 and objective(G, clusters[cluster_id_1] + clusters[cluster_id_2], False)\
+            if objective(G, clusters[cluster_id_1] + clusters[cluster_id_2], False)\
                     < min(objective(G, clusters[cluster_id_1], False), objective(G, clusters[cluster_id_2], False)):
                 groups.union(cluster_id_1, cluster_id_2)
                 neighboring_clusters[cluster_id_1] = neighboring_clusters[cluster_id_1].union(neighboring_clusters[cluster_id_2])
                 neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
                 clusters[cluster_id_1] = list(set(clusters[cluster_id_1] + clusters[cluster_id_2]))
                 clusters[cluster_id_2] = clusters[cluster_id_1]
-                print ("merging clusters ", cluster_id_1, " and ", cluster_id_2)
+                print "merging clusters ", cluster_id_1, " and ", cluster_id_2
                 #print clusters
                 #print neighboring_clusters
     merged_clusters = {}
     for node in groups.vertices:
         parent = groups.find(node)
-        if parent in merged_clusters:
+        if parent in merged_clusters or len(clusters[parent]) == 1:
             continue
         merged_clusters[parent] = clusters[parent]
+
+
     return merged_clusters, groups
 
 
@@ -168,10 +180,22 @@ def cluster(G):
     print ("Initial clusters: ", clusters)
     for cluster_id in clusters.keys():
         objective(G, clusters[cluster_id])
-    clusters, groups = get_merge_clusters(G, clusters)
-    print ("merged_clusters: ", clusters)
-    for cluster_id in clusters.keys():
-        objective(G, clusters[cluster_id])
+
+
+    min_merged_cluster_score = sys.maxint
+    min_scoring_clusters = None
+    min_scoring_groups = None
+    for i in range(50):
+        neighboring_clusters = get_neighboring_clusters(G, clusters)
+        merged_clusters, groups = get_merge_clusters(G, clusters, neighboring_clusters)
+        cur_score = score_clusters(G, merged_clusters)
+        if cur_score < min_merged_cluster_score:
+            min_merged_cluster_score = cur_score
+            min_scoring_clusters = merged_clusters
+            min_scoring_groups = groups
+    print ("merged_clusters: ", min_scoring_clusters)
+    for cluster_id in min_scoring_clusters.keys():
+        objective(G, min_scoring_clusters[cluster_id])
     #objective(G, clusters[2])
     #objective(G, clusters[3])
     #objective(G, clusters[2] + clusters[3])
