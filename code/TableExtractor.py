@@ -12,12 +12,17 @@ def extract_table(input_file, cancer_type):
             selected_col.append(c)
     sub_data = data[selected_col]
     sub_data['mean'] = sub_data.mean(axis=1)
+    sub_data['percentile'] = np.percentile(sub_data, 20, axis=1)
+    sub_data['cutoff'] = sub_data[["mean", "percentile"]].max(axis=1)
     selected_col = selected_col[2:]
     for c in selected_col:
-        sub_data[c] = sub_data[c] >= sub_data['mean']
+        #sub_data[c] = sub_data[c] >= sub_data['mean']
+        sub_data[c] = sub_data[c] >= sub_data['cutoff']
     sub_data = sub_data.drop('mean', 1)
+    sub_data = sub_data.drop('percentile', 1)
+    sub_data = sub_data.drop('cutoff', 1)
     sub_data[list(sub_data.columns)[2:]] = sub_data[list(sub_data.columns)[2:]].astype(int)
-    sub_data.to_csv('../data/' + Cancer_type + '.csv', index=False)
+    sub_data.to_csv('../data/' + Cancer_type + '_0_1_percentile.csv', index=False)
 
 
     selected_col = ['Mutation type', 'Trinucleotide']

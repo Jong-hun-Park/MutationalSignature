@@ -93,6 +93,7 @@ def first_level_cluster(G, dbscan_min_samples):
     name_to_id, id_to_name = get_node_id_map(G)
     dist_matrix = get_dist_matrix(G, name_to_id)
     sim_matrix = get_similarity_matrix(G, name_to_id)
+    print("dbscan_min_samples: ", dbscan_min_samples)
     clustering = DBSCAN(eps=0.5, min_samples=dbscan_min_samples).fit(dist_matrix)
     #clustering = AffinityPropagation(affinity='precomputed').fit(sim_matrix)
     #clusters = AgglomerativeClustering(linkage="average", connectivity=sim_matrix, affinity="precomputed").fit(dist_matrix)
@@ -149,16 +150,19 @@ def get_merge_clusters(G, clusters, neighboring_clusters):
     for cluster_id_1 in cluster_permutations_1:
         cluster_permutations_2 = np.random.permutation(list(set(groups.parent)))
         for cluster_id_2 in cluster_permutations_2:
-            if cluster_id_1 == cluster_id_2 or cluster_id_2 not in neighboring_clusters[cluster_id_1]:
+            root_1 = groups.find(cluster_id_1)
+            root_2 = groups.find(cluster_id_2)
+            if root_1 == root_2 or root_2 not in neighboring_clusters[root_1]:
                 continue
             # merge clusters if they it decreases the objective for both
-            if objective(G, clusters[cluster_id_1] + clusters[cluster_id_2], False)\
-                    < min(objective(G, clusters[cluster_id_1], False), objective(G, clusters[cluster_id_2], False)):
+            if objective(G, clusters[root_1] + clusters[root_2], False)\
+                    <= min(objective(G, clusters[root_1], False), objective(G, clusters[root_2], False)):
                 groups.union(cluster_id_1, cluster_id_2)
-                neighboring_clusters[cluster_id_1] = neighboring_clusters[cluster_id_1].union(neighboring_clusters[cluster_id_2])
-                neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
-                clusters[cluster_id_1] = list(set(clusters[cluster_id_1] + clusters[cluster_id_2]))
-                clusters[cluster_id_2] = clusters[cluster_id_1]
+                root = groups.find(cluster_id_1)
+                neighboring_clusters[root] = neighboring_clusters[root_1].union(neighboring_clusters[root_2])
+                #neighboring_clusters[cluster_id_2] = neighboring_clusters[cluster_id_1]
+                clusters[root] = list(set(clusters[root_1] + clusters[root_2]))
+                #clusters[cluster_id_2] = clusters[cluster_id_1]
     merged_clusters = {}
     for node in groups.vertices:
         parent = groups.find(node)
@@ -176,10 +180,10 @@ def cluster(G, mode):
     if mode == 'dbscan':
         dbscan_min_samples = 2
         clusters = first_level_cluster(G, dbscan_min_samples)
-        print ("Initial clusters: ", clusters)
+        print ("Clusters: ", clusters)
         for cluster_id in clusters.keys():
             objective(G, clusters[cluster_id])
-        return
+        return clusters
     #test_get_deficit()
     #test_cut_capacity()
     initial_clusters = first_level_cluster(G, dbscan_min_samples)
@@ -192,7 +196,7 @@ def cluster(G, mode):
     if mode == 'greedy':
         merged_clusters, groups = get_merge_clusters(G, initial_clusters, initial_neighboring_clusters)
     elif mode == 'random':
-        num_randomization = 100
+        num_randomization = 1000
         min_merged_cluster_score = sys.maxint
         min_scoring_clusters = None
         min_scoring_groups = None
@@ -220,10 +224,6 @@ def get_dict_from_df(df):
         dict[ind] = []
         for j in df[ind]:
             dict[ind].append(j)
-    for t in df["Mutation type"]:
-        dict["Mutation type"].append(t)
-    for t in df["Trinucleotide"]:
-        dict["Trinucleotide"].append(t)
 
     return dict
 
@@ -233,31 +233,36 @@ def merge_dicts(dict_1, dict_2):
     return dict_2
 
 def predict(clusters, matrix, threshold=0.3):
-    individuals_with_signiture = []
+    print("threshold: ", threshold)
     individuals = matrix.keys()
-    print("len mixed individuals: ", len(individuals))
+    individuals_with_signiture = {}
+    for individual in individuals:
+        individuals_with_signiture[individual] = []
+
     for cluster in clusters.values():
-        print ("predicting for cluster: ", cluster)
-        #for individual_index in range(2, len(matrix.columns)):
+        #print ("predicting for cluster: ", cluster)
         for individual in individuals:
             mutations_in_individual = set()
             for i in range(len(matrix[individual])):
                 if matrix[individual][i] == 1:
                     mutations_in_individual.add(matrix["Mutation type"][i] + "/" + matrix["Trinucleotide"][i])
+            #print "mutations_in_individual: ", individual, mutations_in_individual
             shared_mutations = float(len(mutations_in_individual.intersection(set(cluster)))) / float(len(cluster))
             if shared_mutations >= threshold:
-                individuals_with_signiture.append(individual)
-    return list(set(individuals_with_signiture))
+                individuals_with_signiture[individual].append(cluster)
+
+    predicted_individuals = []
+    for individual in individuals_with_signiture:
+        if len(individuals_with_signiture[individual]) >= 0.5 * len(clusters.keys()):
+            predicted_individuals.append(individual)
+    return predicted_individuals
 
 def measure(all_individuals, predicted_disease, true_disease):
-    #print "predicted_disease: ", predicted_disease
-    #print "true_disease: ", true_disease
-    #print "all_individuals: ", all_individuals
     true_positive = len([ind for ind in predicted_disease if ind in true_disease])
     false_positive = len([ind for ind in predicted_disease if ind not in true_disease])
     false_negatives = len([ind for ind in true_disease if ind not in predicted_disease])
-    precision = float(true_positive) / (true_positive + false_positive + 0.01)
-    recall = float(true_positive) / (true_positive + false_negatives + 0.01)
+    precision = float(true_positive) / (true_positive + false_positive + 0.00001)
+    recall = float(true_positive) / (true_positive + false_negatives + 0.000001)
     print("TP: {}, FP: {}, FN: {}, precision: {}, recall: {}".format(true_positive, false_positive, false_negatives, precision, recall))
 
 if __name__ == "__main__":
